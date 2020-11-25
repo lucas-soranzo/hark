@@ -1,3 +1,5 @@
+const PonyfillAudioContext = require('standardized-audio-context');
+
 var WildEmitter = require('wildemitter');
 
 function getMaxVolume (analyser, fftBins) {
@@ -13,20 +15,23 @@ function getMaxVolume (analyser, fftBins) {
   return maxVolume;
 }
 
-
+var providedAnalyser;
 var audioContextType;
 if (typeof window !== 'undefined') {
-  audioContextType = window.AudioContext || window.webkitAudioContext;
+  audioContextType = window.AudioContext || window.webkitAudioContext || PonyfillAudioContext.AudioContext;
 }
 // use a single audio context due to hardware limits
 var audioContext = null;
-module.exports = function(stream, options) {
+module.exports = function(stream, audioCtx, incomeAnalyser, options) {
   var harker = new WildEmitter();
-
+  providedAnalyser = incomeAnalyser;
 
   // make it not break in non-supported browsers
-  if (!audioContextType) return harker;
+  if (!audioContextType) {
+    return harker;
+  }
 
+  console.log("STREAm", stream)
   //Config
   var options = options || {},
       smoothing = (options.smoothing || 0.1),
@@ -38,11 +43,13 @@ module.exports = function(stream, options) {
 
   //Setup Audio Context
   if (!audioContext) {
-    audioContext = new audioContextType();
+    audioContext = audioCtx || new audioContextType();
   }
   var sourceNode, fftBins, analyser;
 
-  analyser = audioContext.createAnalyser();
+  analyser = providedAnalyser || audioContext.createAnalyser();
+  // if (!providedAnalyser) {
+  // }
   analyser.fftSize = 512;
   analyser.smoothingTimeConstant = smoothing;
   fftBins = new Float32Array(analyser.frequencyBinCount);
@@ -59,8 +66,10 @@ module.exports = function(stream, options) {
     threshold = threshold || -50;
   }
 
-  sourceNode.connect(analyser);
-  if (play) analyser.connect(audioContext.destination);
+  if (!providedAnalyser){
+    sourceNode.connect(analyser);
+    if (play) analyser.connect(audioContext.destination);
+  } 
 
   harker.speaking = false;
 
@@ -92,8 +101,10 @@ module.exports = function(stream, options) {
       harker.speaking = false;
       harker.emit('stopped_speaking');
     }
-    analyser.disconnect();
-    sourceNode.disconnect();
+    if(!providedAnalyser) {
+      analyser.disconnect();
+      sourceNode.disconnect();
+    }
   };
   harker.speakingHistory = [];
   for (var i = 0; i < history; i++) {

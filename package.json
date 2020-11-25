@@ -14,6 +14,8 @@
     "attachmediastream": "1.0.x"
   },
   "dependencies": {
+    "audioContext-polyfill": "github:shinnn/AudioContext-Polyfill",
+    "standardized-audio-context": "^25.1.6",
     "wildemitter": "^1.2.0"
   },
   "readmeFilename": "README.md"
